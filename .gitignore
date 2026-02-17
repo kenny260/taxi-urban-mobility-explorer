@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Data (DO NOT COMMIT)
+data/raw/*
+data/processed/*
+*.parquet
+*.csv
+*.geojson
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
