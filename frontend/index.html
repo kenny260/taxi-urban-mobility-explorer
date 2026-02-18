@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Taxi Data Explorer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>NYC Taxi Explorer</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#overview" class="nav-link active" data-page="overview">Overview</a></li>
+            <li><a href="#explorer" class="nav-link" data-page="explorer">Trip Explorer</a></li>
+            <li><a href="#insights" class="nav-link" data-page="insights">Insights</a></li>
+        </ul>
+    </nav>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading data...</p>
+    </div>
+
+    <div id="error-message" class="error-message hidden">
+        <p></p>
+        <button onclick="hideError()">Dismiss</button>
+    </div>
+
+    <main>
+        <!-- OVERVIEW PAGE -->
+        <div id="overview-page" class="page active">
+            <section class="filter-panel">
+                <h2>Filters</h2>
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label for="date-from">Date From:</label>
+                        <input type="date" id="date-from" value="2019-01-01" min="2019-01-01" max="2019-01-31">
+                    </div>
+                    <div class="filter-group">
+                        <label for="date-to">Date To:</label>
+                        <input type="date" id="date-to" value="2019-01-31" min="2019-01-01" max="2019-01-31">
+                    </div>
+                    <div class="filter-group">
+                        <label for="borough-filter">Borough:</label>
+                        <select id="borough-filter">
+                            <option value="all">All Boroughs</option>
+                            <option value="Manhattan">Manhattan</option>
+                            <option value="Brooklyn">Brooklyn</option>
+                            <option value="Queens">Queens</option>
+                            <option value="Bronx">Bronx</option>
+                            <option value="Staten Island">Staten Island</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="time-category">Time Period:</label>
+                        <select id="time-category">
+                            <option value="all">All Times</option>
+                            <option value="late_night">Late Night (0-5am)</option>
+                            <option value="morning_rush">Morning Rush (6-9am)</option>
+                            <option value="midday">Midday (10am-3pm)</option>
+                            <option value="evening_rush">Evening Rush (4-7pm)</option>
+                            <option value="night">Night (8pm-11pm)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="fare-min">Min Fare ($):</label>
+                        <input type="number" id="fare-min" value="0" min="0" step="1">
+                    </div>
+                    <div class="filter-group">
+                        <label for="fare-max">Max Fare ($):</label>
+                        <input type="number" id="fare-max" value="500" min="0" step="1">
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button id="apply-filters" class="btn btn-primary">Apply Filters</button>
+                    <button id="reset-filters" class="btn btn-secondary">Reset</button>
+                    <button id="export-data" class="btn btn-secondary">Export CSV</button>
+                </div>
+            </section>
+
+            <section class="summary-cards">
+                <div class="stat-card">
+                    <h3>Total Trips</h3>
+                    <p class="stat-value" id="total-trips">--</p>
+                    <span class="stat-change">January 2019</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <p class="stat-value" id="total-revenue">--</p>
+                    <span class="stat-change">All transactions</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Fare</h3>
+                    <p class="stat-value" id="avg-fare">--</p>
+                    <span class="stat-change">Per trip</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Speed</h3>
+                    <p class="stat-value" id="avg-speed">--</p>
+                    <span class="stat-change">Miles per hour</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Distance</h3>
+                    <p class="stat-value" id="avg-distance">--</p>
+                    <span class="stat-change">Miles per trip</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Tip</h3>
+                    <p class="stat-value" id="avg-tip">--</p>
+                    <span class="stat-change">Percentage</span>
+                </div>
+            </section>
+
+            <section class="charts-grid">
+                <div class="chart-card">
+                    <h3>Hourly Demand Pattern</h3>
+                    <canvas id="hourly-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Borough Revenue Distribution</h3>
+                    <canvas id="borough-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Daily Trip Volume</h3>
+                    <canvas id="daily-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Time Category Performance</h3>
+                    <canvas id="time-category-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Fare Distribution</h3>
+                    <canvas id="fare-distribution"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Distance vs Fare Correlation</h3>
+                    <canvas id="distance-fare-scatter"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- TRIP EXPLORER PAGE -->
+        <div id="explorer-page" class="page">
+            <section class="explorer-header">
+                <h2>Trip Data Explorer</h2>
+                <div class="explorer-controls">
+                    <input type="text" id="search-box" placeholder="Search by zone...">
+                    <select id="sort-by">
+                        <option value="trip_id">Trip ID</option>
+                        <option value="fare_amount">Fare</option>
+                        <option value="trip_distance">Distance</option>
+                        <option value="trip_speed_mph">Speed</option>
+                    </select>
+                    <select id="sort-order">
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="data-table-section">
+                <div class="table-container">
+                    <table id="trips-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="trip_id">Trip ID ↕</th>
+                                <th data-sort="pickup_datetime">Pickup Time ↕</th>
+                                <th data-sort="pickup_borough">Pickup Borough ↕</th>
+                                <th data-sort="dropoff_borough">Dropoff Borough ↕</th>
+                                <th data-sort="trip_distance">Distance (mi) ↕</th>
+                                <th data-sort="fare_amount">Fare ↕</th>
+                                <th data-sort="trip_speed_mph">Speed (mph) ↕</th>
+                                <th data-sort="time_category">Time Period ↕</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trips-tbody">
+                            <tr><td colspan="8">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button id="prev-page" class="btn">Previous</button>
+                    <span id="page-info">Page 1</span>
+                    <button id="next-page" class="btn">Next</button>
+                    <select id="page-size">
+                        <option value="50">50 per page</option>
+                        <option value="100" selected>100 per page</option>
+                        <option value="200">200 per page</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="top-routes">
+                <h3>Top 20 Routes</h3>
+                <div class="table-container">
+                    <table id="routes-table">
+                        <thead>
+                            <tr>
+                                <th>Route</th>
+                                <th>Trip Count</th>
+                                <th>Avg Fare</th>
+                                <th>Avg Distance</th>
+                                <th>Avg Speed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="routes-tbody">
+                            <tr><td colspan="5">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- INSIGHTS PAGE -->
+        <div id="insights-page" class="page">
+            <section class="insights-hero">
+                <h2>Key Insights from January 2019 Data</h2>
+                <p>Data-driven discoveries about NYC taxi operations</p>
+            </section>
+
+            <section class="insight-cards">
+                <div class="insight-card">
+                    <div class="insight-number">1</div>
+                    <h3>Rush Hour Economics</h3>
+                    <div class="insight-content">
+                        <canvas id="insight-1-chart"></canvas>
+                        <div class="insight-text">
+                            <h4>Finding:</h4>
+                            <p id="insight-1-finding">Loading...</p>
+                            <h4>Interpretation:</h4>
+                            <p id="insight-1-interpretation">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-number">2</div>
+                    <h3>Borough Imbalance</h3>
+                    <div class="insight-content">
+                        <canvas id="insight-2-chart"></canvas>
+                        <div class="insight-text">
+                            <h4>Finding:</h4>
+                            <p id="insight-2-finding">Loading...</p>
+                            <h4>Implications:</h4>
+                            <p id="insight-2-interpretation">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="insight-card">
+                    <div class="insight-number">3</div>
+                    <h3>Distance Efficiency Patterns</h3>
+                    <div class="insight-content">
+                        <canvas id="insight-3-chart"></canvas>
+                        <div class="insight-text">
+                            <h4>Finding:</h4>
+                            <p id="insight-3-finding">Loading...</p>
+                            <h4>Recommendations:</h4>
+                            <p id="insight-3-interpretation">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>NYC Taxi Data Explorer | Data Source: NYC TLC | January 2019 | Built with Vanilla JS</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
