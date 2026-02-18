@@ -3,11 +3,14 @@ import csv
 import os
 from collections import defaultdict
 
-DB_FILE = "database/nyc_taxi.db"
-SCHEMA_FILE = "database/schema.sql"
-ZONES_FILE = "data/raw/taxi_zone_lookup.csv"
-TRIPS_FILE = "data/processed/yellow_tripdata_2019-01_cleaned.csv"
-DUPLICATES_LOG = "data/cleaning_log_duplicates.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_FILE = os.path.join(BASE_DIR, "nyc_taxi.db")
+SCHEMA_FILE = os.path.join(BASE_DIR, "schema.sql")
+ZONES_FILE = os.path.join(BASE_DIR, "..", "data", "raw", "taxi_zone_lookup.csv")
+TRIPS_FILE = os.path.join(BASE_DIR, "..", "data", "processed", "yellow_tripdata_2019-01_cleaned.csv")
+DUPLICATES_LOG = os.path.join(BASE_DIR, "..", "data", "cleaning_log_duplicates.csv")
+
 BATCH_SIZE = 10000
 
 def create_database():
