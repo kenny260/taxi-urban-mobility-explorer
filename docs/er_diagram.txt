@@ -1,0 +1,70 @@
+
+                        NYC TAXI DATA EXPLORER
+                   ENTITY-RELATIONSHIP DIAGRAM
+
+
+                          ┌─────────────────────┐
+                          │      rate_types     │  (Dimension)
+                          ├─────────────────────┤
+                          │ PK  RatecodeID      │
+                          │     Description     │
+                          └───────────┬─────────┘
+                                      │ 1
+                                      │
+                                      │
+                                      │ N
+                   ┌──────────────────┴───────────────────┐
+                   │                 trips                 │  (Fact Table)
+                   ├───────────────────────────────────────┤
+                   │ PK  trip_id (AUTOINCREMENT)           │
+                   │     VendorID                          │
+                   │     tpep_pickup_datetime              |
+                   │     tpep_dropoff_datetime             │
+                   │     passenger_count                   │
+                   │     trip_distance                     │
+                   │ FK  RatecodeID → rate_types.RatecodeID│
+                   │     store_and_fwd_flag                │
+                   │ FK  PULocationID → zones.LocationID   │
+                   │ FK  DOLocationID → zones.LocationID   │
+                   │     payment_type                      │
+                   │     fare_amount                       │
+                   │     extra                             │
+                   │     mta_tax                           │
+                   │     tip_amount                        │
+                   │     tolls_amount                      │
+                   │     improvement_surcharge             │
+                   │     total_amount                      │
+                   │     congestion_surcharge              │
+                   │ ───────── DERIVED FEATURES ───────────│
+                   │     trip_speed_mph                    │
+                   │     cost_per_mile                     │
+                   │     time_category                     │
+                   │     tip_percentage                    │
+                   │     efficiency_score                  │
+                   └─────────────┬─────────────┬───────────┘
+                                 │             │
+                                 │ N           │ N
+                                 │             │
+                                 │ 1           │ 1
+                 ┌───────────────┴───────────┐ ┌───────────────┐
+                 │          zones             │ │     zones     │
+                 │      (Pickup Zones)       │ │ (Dropoff Zones)│
+                 ├───────────────────────────┤ ├───────────────┤
+                 │ PK  LocationID            │ │ PK  LocationID │
+                 │     Borough               │ │     Borough    │
+                 │     Zone                  │ │     Zone       │
+                 │     service_zone          │ │     service_zone│
+                 └───────────────────────────┘ └───────────────┘
+
+CARDINALITY:
+- One rate type can have MANY trips (1:N)
+- One zone can be pickup for MANY trips (1:N)
+- One zone can be dropoff for MANY trips (1:N)
+- Each trip has ONE pickup zone (N:1)
+- Each trip has ONE dropoff zone (N:1)
+- Each trip has ONE rate type (N:1)
+
+INDEXES (recommended):
+- trips: tpep_pickup_datetime, tpep_dropoff_datetime, PULocationID, DOLocationID
+- trips: time_category, fare_amount, trip_distance
+
