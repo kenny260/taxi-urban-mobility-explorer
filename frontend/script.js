@@ -1,8 +1,8 @@
+
+// CONFIG
+
 const API_BASE = 'http://localhost:5000/api';
 
-/* =============================
-   GLOBAL STATE
-============================= */
 const state = {
     view: 'dashboard',
     page: 1,
@@ -11,32 +11,18 @@ const state = {
     data: {}
 };
 
-/* =============================
-   FORMATTERS (fixed zero bug)
-============================= */
+
+// FORMATTING HELPERS
+
 const format = {
-    num: (n) =>
-        n !== null && n !== undefined
-            ? Number(n).toLocaleString()
-            : '--',
-
-    curr: (n) =>
-        n !== null && n !== undefined
-            ? `$${Number(n).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-              })}`
-            : '--',
-
-    dec: (n, d = 1) =>
-        n !== null && n !== undefined
-            ? Number(n).toFixed(d)
-            : '--'
+    num: (n) => n ? n.toLocaleString() : '--',
+    curr: (n) => n ? `$${n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '--',
+    dec: (n, d = 1) => n ? n.toFixed(d) : '--'
 };
 
-/* =============================
-   UI HELPERS
-============================= */
+
+// UI HELPERS
+
 const ui = {
     show: (id) => document.getElementById(id)?.classList.remove('hidden'),
     hide: (id) => document.getElementById(id)?.classList.add('hidden'),
@@ -47,9 +33,9 @@ const ui = {
     }
 };
 
-/* =============================
-   API LAYER
-============================= */
+
+// API CALLS
+
 const api = {
     async fetch(endpoint) {
         try {
@@ -62,19 +48,39 @@ const api = {
         }
     },
 
-    overview: () => api.fetch('/stats/overview'),
-    hourly: () => api.fetch('/stats/hourly'),
-    boroughs: () => api.fetch('/stats/boroughs'),
-    daily: () => api.fetch('/stats/daily'),
-    timeCategories: () => api.fetch('/stats/time-categories'),
+    summary: () => api.fetch('/stats/summary'),                // summary stats
+    hourly: () => api.fetch('/stats/hourly-patterns'),         // hourly trips
+    boroughRevenue: () => api.fetch('/stats/borough-revenue'), // borough revenue
+    fareDistribution: () => api.fetch('/stats/fare-distribution'),
     routes: () => api.fetch('/stats/top-routes'),
-    trips: (limit, offset) =>
-        api.fetch(`/trips?limit=${limit}&offset=${offset}`)
+    trips: (limit, offset) => api.fetch(`/trips?limit=${limit}&offset=${offset}`)
 };
 
-/* =============================
-   CHART HELPERS
-============================= */
+
+// CHART CONFIG
+
+const chartConfig = {
+    defaults: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: false } }
+    },
+    colors: {
+        primary: '#4f46e5',
+        secondary: '#7c3aed',
+        success: '#10b981',
+        gradient: (ctx) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(79, 70, 229, 0.8)');
+            gradient.addColorStop(1, 'rgba(79, 70, 229, 0.2)');
+            return gradient;
+        }
+    }
+};
+
+
+// CHART HELPERS
+
 const charts = {
     destroy(id) {
         if (state.charts[id]) {
@@ -87,42 +93,84 @@ const charts = {
         charts.destroy(id);
         const canvas = ui.get(id);
         if (!canvas) return;
-
         const ctx = canvas.getContext('2d');
+        state.charts[id] = new Chart(ctx, { type, data, options: { ...chartConfig.defaults, ...options } });
+    },
 
-        state.charts[id] = new Chart(ctx, {
-            type,
-            data,
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                ...options
+    bar(id, labels, values, color = chartConfig.colors.primary) {
+        charts.create(id, 'bar', {
+            labels,
+            datasets: [{ data: values, backgroundColor: color, borderRadius: 6 }]
+        }, {
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
+                x: { grid: { display: false } }
             }
         });
+    },
+
+    line(id, labels, values, color = chartConfig.colors.primary) {
+        charts.create(id, 'line', {
+            labels,
+            datasets: [{
+                data: values,
+                borderColor: color,
+                backgroundColor: chartConfig.colors.gradient,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: color
+            }]
+        }, {
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
+                x: { grid: { display: false } }
+            }
+        });
+    },
+
+    doughnut(id, labels, values) {
+        const colors = ['#4f46e5', '#7c3aed', '#ec4899', '#f59e0b', '#10b981'];
+        charts.create(id, 'doughnut', {
+            labels,
+            datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+        }, { plugins: { legend: { display: true, position: 'bottom' } } });
     }
 };
 
-/* =============================
-   VIEWS
-============================= */
+
+// VIEWS
+
 const views = {
     async dashboard() {
         ui.show('loader');
 
-        const [overview, hourly, boroughs] = await Promise.all([
-            api.overview(),
+        const [summary, hourly, boroughs] = await Promise.all([
+            api.summary(),
             api.hourly(),
-            api.boroughs()
+            api.boroughRevenue()
         ]);
 
-        if (overview) {
-            ui.setText('stat-trips', format.num(overview.total_trips));
-            ui.setText('stat-revenue', format.curr(overview.total_revenue));
-            ui.setText('stat-fare', format.curr(overview.avg_fare));
-            ui.setText(
-                'stat-speed',
-                `${format.dec(overview.avg_speed)} mph`
+        if (summary) {
+            ui.setText('stat-trips', format.num(summary.total_trips));
+            ui.setText('stat-revenue', format.curr(summary.total_revenue));
+            ui.setText('stat-fare', format.curr(summary.avg_fare));
+            ui.setText('stat-speed', `${format.dec(summary.avg_speed)} mph`);
+        }
+
+        if (hourly) {
+            charts.bar(
+                'hourly-chart',
+                hourly.map(h => `${h.hour}:00`),
+                hourly.map(h => h.trip_count)
+            );
+        }
+
+        if (boroughs) {
+            charts.doughnut(
+                'borough-chart',
+                boroughs.map(b => b.borough),
+                boroughs.map(b => b.total_revenue)
             );
         }
 
@@ -131,32 +179,18 @@ const views = {
 
     async data() {
         ui.show('loader');
-
         const offset = (state.page - 1) * state.pageSize;
-
         const [trips, routes] = await Promise.all([
             api.trips(state.pageSize, offset),
             api.routes()
         ]);
 
         if (trips) {
-            /* 🔥 FIXED: map backend field names properly */
-            state.data.trips = trips.map(t => ({
-                ...t,
-                pickup_datetime: t.tpep_pickup_datetime,
-                distance: t.trip_distance,
-                fare: t.fare_amount,
-                tip: t.tip_amount,
-                total: t.total_amount,
-                speed: t.trip_speed_mph
-            }));
-
+            state.data.trips = trips; // store for CSV export
             const tbody = ui.get('data-tbody');
             tbody.innerHTML = '';
-
-            state.data.trips.forEach(trip => {
+            trips.forEach(trip => {
                 const row = tbody.insertRow();
-
                 row.innerHTML = `
                     <td>${trip.trip_id}</td>
                     <td>${new Date(trip.pickup_datetime).toLocaleString()}</td>
@@ -166,24 +200,19 @@ const views = {
                     <td>${format.curr(trip.fare)}</td>
                     <td>${format.dec(trip.speed)} mph</td>
                 `;
-
+                row.style.cursor = 'pointer';
                 row.onclick = () => showTripDetail(trip);
             });
-
             ui.setText('page-info', `Page ${state.page}`);
         }
 
         if (routes) {
             const list = ui.get('routes-list');
             list.innerHTML = '';
-
             routes.slice(0, 10).forEach(route => {
                 const div = document.createElement('div');
                 div.className = 'route-item';
-                div.innerHTML = `
-                    <span>${route.route}</span>
-                    <span>${format.num(route.trip_count)} trips</span>
-                `;
+                div.innerHTML = `<span>${route.route}</span><span>${format.num(route.trip_count)} trips</span>`;
                 list.appendChild(div);
             });
         }
@@ -192,103 +221,81 @@ const views = {
     }
 };
 
-/* =============================
-   TRIP DETAIL (no undefined)
-============================= */
+
+// TRIP DETAIL
+
 const showTripDetail = (trip) => {
-    alert(`
-Trip ID: ${trip.trip_id}
-Pickup: ${trip.pickup_borough} - ${trip.pickup_zone}
-Dropoff: ${trip.dropoff_borough} - ${trip.dropoff_zone}
-Distance: ${format.dec(trip.distance)} miles
-Fare: ${format.curr(trip.fare)}
-Tip: ${format.curr(trip.tip)}
-Total: ${format.curr(trip.total)}
-Speed: ${format.dec(trip.speed)} mph
-`);
+    const msg = [
+        'Trip Details',
+        '',
+        `ID: ${trip.trip_id}`,
+        `Pickup: ${trip.pickup_borough} - ${trip.pickup_zone}`,
+        `Dropoff: ${trip.dropoff_borough} - ${trip.dropoff_zone}`,
+        `Distance: ${format.dec(trip.distance)} miles`,
+        `Fare: ${format.curr(trip.fare)}`,
+        `Tip: ${format.curr(trip.tip)}`,
+        `Total: ${format.curr(trip.total)}`,
+        `Speed: ${format.dec(trip.speed)} mph`
+    ].join('\n');
+
+    alert(msg);
 };
 
-/* =============================
-   EXPORT CSV (uses mapped data)
-============================= */
-const exportCSV = () => {
-    const data = state.data.trips;
-    if (!data || data.length === 0) {
-        alert('No data to export');
-        return;
-    }
+// NAVIGATION
 
-    const headers = ['ID', 'Time', 'Pickup', 'Dropoff', 'Distance', 'Fare', 'Speed'];
-
-    const rows = data.map(t => [
-        t.trip_id,
-        t.pickup_datetime,
-        t.pickup_borough,
-        t.dropoff_borough,
-        t.distance,
-        t.fare,
-        t.speed
-    ]);
-
-    const csv = [headers, ...rows]
-        .map(r => r.join(','))
-        .join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nyc-taxi-${Date.now()}.csv`;
-    a.click();
-
-    URL.revokeObjectURL(url);
-};
-
-/* =============================
-   NAVIGATION
-============================= */
 const navigate = (view) => {
     state.view = view;
 
-    document.querySelectorAll('.nav-item').forEach(item =>
-        item.classList.toggle('active', item.dataset.view === view)
-    );
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.view === view);
+    });
 
-    document.querySelectorAll('.view').forEach(v =>
-        v.classList.toggle('active', v.id === `${view}-view`)
-    );
+    document.querySelectorAll('.view').forEach(v => {
+        v.classList.toggle('active', v.id === `${view}-view`);
+    });
+
+    const titles = {
+        dashboard: { title: 'Dashboard', subtitle: 'Overview of taxi operations' },
+        data: { title: 'Data Explorer', subtitle: 'Browse trip records' }
+    };
+
+    ui.setText('page-title', titles[view].title);
+    ui.setText('page-subtitle', titles[view].subtitle);
 
     if (views[view]) views[view]();
 };
 
-/* INIT */
+// CSV EXPORT
+
+const exportCSV = () => {
+    const data = state.data.trips;
+    if (!data || data.length === 0) { alert('No data to export'); return; }
+
+    const headers = ['ID', 'Time', 'Pickup', 'Dropoff', 'Distance', 'Fare', 'Speed'];
+    const rows = data.map(t => [t.trip_id, t.pickup_datetime, t.pickup_borough, t.dropoff_borough, t.distance, t.fare, t.speed]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nyc-taxi-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+
+// INIT
 
 const init = () => {
-    document.querySelectorAll('.nav-item').forEach(item =>
-        item.addEventListener('click', e => {
-            e.preventDefault();
-            navigate(item.dataset.view);
-        })
-    );
-
-    ui.get('refresh-btn')?.addEventListener('click', () => {
-        if (views[state.view]) views[state.view]();
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', e => { e.preventDefault(); navigate(item.dataset.view); });
     });
 
+    ui.get('refresh-btn')?.addEventListener('click', () => { if (views[state.view]) views[state.view](); });
     ui.get('export-btn')?.addEventListener('click', exportCSV);
-
-    ui.get('prev-btn')?.addEventListener('click', () => {
-        if (state.page > 1) {
-            state.page--;
-            views.data();
-        }
-    });
-
-    ui.get('next-btn')?.addEventListener('click', () => {
-        state.page++;
-        views.data();
-    });
+    ui.get('prev-btn')?.addEventListener('click', () => { if (state.page > 1) { state.page--; views.data(); } });
+    ui.get('next-btn')?.addEventListener('click', () => { state.page++; views.data(); });
+    ui.get('apply-filter')?.addEventListener('click', () => { state.page = 1; views.data(); });
 
     navigate('dashboard');
 };
