@@ -51,6 +51,13 @@ const api = {
     summary: () => api.fetch('/stats/summary'),                // summary stats
     hourly: () => api.fetch('/stats/hourly-patterns'),         // hourly trips
     boroughRevenue: () => api.fetch('/stats/borough-revenue'), // borough revenue
+    overview: () => api.fetch('/stats/overview'),
+    summary: () => api.fetch('/stats/summary'),
+    hourly: () => api.fetch('/stats/hourly-patterns'),
+    boroughs: () => api.fetch('/stats/boroughs'),
+    boroughRevenue: () => api.fetch('/stats/borough-revenue'),
+    daily: () => api.fetch('/stats/daily'),
+    timeCategories: () => api.fetch('/stats/time-categories'),
     fareDistribution: () => api.fetch('/stats/fare-distribution'),
     routes: () => api.fetch('/stats/top-routes'),
     trips: (limit, offset) => api.fetch(`/trips?limit=${limit}&offset=${offset}`)
@@ -98,12 +105,22 @@ const charts = {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         state.charts[id] = new Chart(ctx, { type, data, options: { ...chartConfig.defaults, ...options } });
+        state.charts[id] = new Chart(ctx, { 
+            type, 
+            data, 
+            options: { ...chartConfig.defaults, ...options } 
+        });
     },
 
     bar(id, labels, values, color = chartConfig.colors.primary) {
         charts.create(id, 'bar', {
             labels,
             datasets: [{ data: values, backgroundColor: color, borderRadius: 6 }]
+            datasets: [{ 
+                data: values, 
+                backgroundColor: color, 
+                borderRadius: 6 
+            }]
         }, {
             scales: {
                 y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
@@ -144,6 +161,20 @@ const charts = {
 
 // VIEWS
 
+            datasets: [{ 
+                data: values, 
+                backgroundColor: colors, 
+                borderWidth: 2, 
+                borderColor: '#fff' 
+            }]
+        }, { 
+            plugins: { 
+                legend: { display: true, position: 'bottom' } 
+            } 
+        });
+    }
+};
+
 const views = {
     async dashboard() {
         ui.show('loader');
@@ -180,6 +211,125 @@ const views = {
         ui.hide('loader');
     },
 
+    
+    async analytics() {
+        ui.show('loader');
+        
+        const [daily, timeCategories] = await Promise.all([
+            api.daily(),
+            api.timeCategories()
+        ]);
+        
+        if (daily) {
+            charts.line(
+                'daily-chart',
+                daily.map(d => d.date.split('-')[2]),
+                daily.map(d => d.total_trips)
+            );
+        }
+        
+        if (timeCategories) {
+            const labels = {
+                'late_night': 'Late Night',
+                'morning_rush': 'Morning',
+                'midday': 'Midday',
+                'evening_rush': 'Evening',
+                'night': 'Night'
+            };
+            
+            charts.bar(
+                'time-chart',
+                timeCategories.map(t => labels[t.time_category]),
+                timeCategories.map(t => t.avg_fare),
+                chartConfig.colors.secondary
+            );
+            
+            charts.bar(
+                'speed-chart',
+                timeCategories.map(t => labels[t.time_category]),
+                timeCategories.map(t => t.avg_speed),
+                chartConfig.colors.success
+            );
+        }
+        
+        ui.hide('loader');
+    },
+    
+    async insights() {
+        ui.show('loader');
+        
+        if (!state.data.hourly) state.data.hourly = await api.hourly();
+        if (!state.data.boroughs) state.data.boroughs = await api.boroughRevenue();
+        if (!state.data.timeCategories) state.data.timeCategories = await api.timeCategories();
+        
+        const { hourly, boroughs, timeCategories } = state.data;
+        
+        // Insight 1: Rush Hour Economics
+        if (hourly) {
+            const rush = hourly.filter(h => h.hour >= 7 && h.hour <= 9);
+            const offPeak = hourly.filter(h => h.hour >= 10 && h.hour <= 15);
+            const rushAvg = rush.reduce((s, h) => s + h.avg_fare, 0) / rush.length;
+            const offPeakAvg = offPeak.reduce((s, h) => s + h.avg_fare, 0) / offPeak.length;
+            const diff = ((rushAvg - offPeakAvg) / offPeakAvg * 100).toFixed(1);
+            
+            ui.setText('insight-1-value', `+${diff}% Higher`);
+            ui.setText('insight-1-text', 
+                `Morning rush hour (7-9am) fares average ${format.curr(rushAvg)}, which is ${diff}% higher than midday rates of ${format.curr(offPeakAvg)}. This premium reflects peak demand and congestion.`);
+            
+            charts.line(
+                'insight-1-chart',
+                hourly.map(h => `${h.hour}h`),
+                hourly.map(h => h.avg_fare)
+            );
+        }
+        
+        // Insight 2: Borough Distribution
+        if (boroughs) {
+            const total = boroughs.reduce((s, b) => s + b.total_trips, 0);
+            const manhattan = boroughs.find(b => b.borough === 'Manhattan');
+            const pct = ((manhattan.total_trips / total) * 100).toFixed(1);
+            
+            ui.setText('insight-2-value', `${pct}% Market Share`);
+            ui.setText('insight-2-text', 
+                `Manhattan dominates with ${format.num(manhattan.total_trips)} trips (${pct}% of total), generating ${format.curr(manhattan.total_revenue)}. This concentration reveals opportunities for improved service distribution.`);
+            
+            charts.doughnut(
+                'insight-2-chart',
+                boroughs.map(b => b.borough),
+                boroughs.map(b => b.total_trips)
+            );
+        }
+        
+        // Insight 3: Speed Analysis
+        if (timeCategories) {
+            const sorted = [...timeCategories].sort((a, b) => b.avg_speed - a.avg_speed);
+            const fastest = sorted[0];
+            const slowest = sorted[sorted.length - 1];
+            const speedDiff = ((fastest.avg_speed - slowest.avg_speed) / slowest.avg_speed * 100).toFixed(1);
+            
+            const labels = {
+                'late_night': 'Late Night',
+                'morning_rush': 'Morning Rush',
+                'midday': 'Midday',
+                'evening_rush': 'Evening Rush',
+                'night': 'Night'
+            };
+            
+            ui.setText('insight-3-value', `${speedDiff}% Variance`);
+            ui.setText('insight-3-text', 
+                `${labels[fastest.time_category]} trips average ${format.dec(fastest.avg_speed)} mph versus ${format.dec(slowest.avg_speed)} mph during ${labels[slowest.time_category]}. Off-peak travel significantly reduces journey times.`);
+            
+            charts.bar(
+                'insight-3-chart',
+                timeCategories.map(t => labels[t.time_category]),
+                timeCategories.map(t => t.avg_speed),
+                chartConfig.colors.success
+            );
+        }
+        
+        ui.hide('loader');
+    },
+    
     async data() {
         ui.show('loader');
         const offset = (state.page - 1) * state.pageSize;
@@ -190,6 +340,7 @@ const views = {
 
         if (trips) {
             state.data.trips = trips; // store for CSV export
+            state.data.trips = trips;
             const tbody = ui.get('data-tbody');
             tbody.innerHTML = '';
             trips.forEach(trip => {
@@ -216,6 +367,10 @@ const views = {
                 const div = document.createElement('div');
                 div.className = 'route-item';
                 div.innerHTML = `<span>${route.route}</span><span>${format.num(route.trip_count)} trips</span>`;
+                div.innerHTML = `
+                    <span>${route.pickup_zone} → ${route.dropoff_zone}</span>
+                    <span>${format.num(route.trip_count)} trips</span>
+                `;
                 list.appendChild(div);
             });
         }
@@ -265,6 +420,12 @@ const navigate = (view) => {
     ui.setText('page-title', titles[view].title);
     ui.setText('page-subtitle', titles[view].subtitle);
 
+    
+    if (titles[view]) {
+        ui.setText('page-title', titles[view].title);
+        ui.setText('page-subtitle', titles[view].subtitle);
+    }
+    
     if (views[view]) views[view]();
 };
 
@@ -299,6 +460,30 @@ const init = () => {
     ui.get('next-btn')?.addEventListener('click', () => { state.page++; views.data(); });
     ui.get('apply-filter')?.addEventListener('click', () => { state.page = 1; views.data(); });
 
+    
+    ui.get('refresh-btn')?.addEventListener('click', () => {
+        if (views[state.view]) views[state.view]();
+    });
+    
+    ui.get('export-btn')?.addEventListener('click', exportCSV);
+    
+    ui.get('prev-btn')?.addEventListener('click', () => {
+        if (state.page > 1) {
+            state.page--;
+            views.data();
+        }
+    });
+    
+    ui.get('next-btn')?.addEventListener('click', () => {
+        state.page++;
+        views.data();
+    });
+    
+    ui.get('apply-filter')?.addEventListener('click', () => {
+        state.page = 1;
+        views.data();
+    });
+    
     navigate('dashboard');
 };
 
