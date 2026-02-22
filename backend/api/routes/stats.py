@@ -8,6 +8,7 @@ const state = {
     data: {}
 };
 
+<<<<<<< HEAD
 /* =========================
    Formatting Helpers
 ========================= */
@@ -310,3 +311,150 @@ const init = () => {
 };
 
 document.addEventListener('DOMContentLoaded', init);
+=======
+@stats_bp.route("/borough-revenue")
+def borough_revenue():
+    """Alias for boroughs endpoint"""
+    return boroughs()
+
+@stats_bp.route("/overview")
+def overview():
+    """Get overall statistics"""
+    conn = None
+    try:
+        conn = get_connection()
+        row = conn.execute("""
+            SELECT
+                COUNT(*) AS total_trips,
+                ROUND(SUM(total_amount), 2) AS total_revenue,
+                ROUND(AVG(total_amount), 2) AS avg_fare,
+                ROUND(AVG(trip_distance), 2) AS avg_distance,
+                ROUND(AVG(trip_speed_mph), 2) AS avg_speed,
+                ROUND(AVG(tip_percentage), 2) AS avg_tip_pct
+            FROM trips
+        """).fetchone()
+        return jsonify(dict(row))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@stats_bp.route("/hourly")
+def hourly():
+    """Get hourly demand patterns"""
+    try:
+        return jsonify(cached_query("SELECT * FROM v_hourly_demand"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@stats_bp.route("/boroughs")
+def boroughs():
+    """Get borough statistics"""
+    try:
+        return jsonify(cached_query("SELECT * FROM v_borough_revenue"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@stats_bp.route("/daily")
+def daily():
+    """Get daily revenue statistics"""
+    try:
+        return jsonify(cached_query("SELECT * FROM v_daily_revenue"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@stats_bp.route("/time-categories")
+def time_categories():
+    """Get time category statistics"""
+    try:
+        return jsonify(cached_query("SELECT * FROM v_time_category_stats"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@stats_bp.route("/top-routes")
+def top_routes():
+    """Get top routes sorted by trip count"""
+    conn = None
+    try:
+        conn = get_connection()
+        rows = conn.execute("""
+            SELECT
+                route,
+                pickup_zone,
+                dropoff_zone,
+                trip_count,
+                avg_fare,
+                avg_distance,
+                avg_speed
+            FROM v_top_routes
+            LIMIT 20
+        """).fetchall()
+        routes = [dict(row) for row in rows]
+        sorted_routes = quicksort_routes(routes)
+        return jsonify(sorted_routes)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@stats_bp.route("/summary")
+def summary():
+    """Legacy endpoint"""
+    conn = None
+    try:
+        conn = get_connection()
+        row = conn.execute("""
+            SELECT
+                COUNT(*) AS total_trips,
+                ROUND(AVG(fare_amount), 2) AS avg_fare,
+                ROUND(SUM(trip_distance), 2) AS total_distance,
+                ROUND(SUM(total_amount), 2) AS total_revenue
+            FROM trips
+        """).fetchone()
+        return jsonify(dict(row))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@stats_bp.route("/hourly-patterns")
+def hourly_patterns():
+    """Legacy endpoint"""
+    try:
+        return jsonify(cached_query("SELECT * FROM v_hourly_demand"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@stats_bp.route("/fare-distribution")
+def fare_distribution():
+    """Get fare distribution"""
+    conn = None
+    try:
+        conn = get_connection()
+        rows = conn.execute("""
+            SELECT
+                ROUND(fare_amount, 0) as fare_bucket,
+                COUNT(*) as trip_count
+            FROM trips
+            GROUP BY fare_bucket
+            ORDER BY fare_bucket
+        """).fetchall()
+        return jsonify([dict(row) for row in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+@stats_bp.route("/daily-revenue")
+def daily_revenue():
+    """Alias for daily endpoint"""
+    return daily()
+
+@stats_bp.route("/time-category-stats")
+def time_category_stats():
+    """Alias for time-categories endpoint"""
+    return time_categories()
+>>>>>>> 572e0b9 (debugging)
