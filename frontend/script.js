@@ -78,6 +78,9 @@ const chartConfig = {
     }
 };
 
+fetch('/api/stats')
+  .then(response => response.json())
+  .catch(error => console.error("Error fetching stats:", error));
 
 // CHART HELPERS
 
@@ -282,7 +285,6 @@ const exportCSV = () => {
     a.click();
     URL.revokeObjectURL(url);
 };
-
 
 // INIT
 

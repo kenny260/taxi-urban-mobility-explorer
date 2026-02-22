@@ -3,7 +3,7 @@
 
 Taxi Urban Mobility Explorer is a full-stack data analytics system built to analyze NYC Yellow Taxi trip data. The system allows users to explore revenue distribution, trip volume trends, and busiest pickup-dropoff routes through a web dashboard. The backend exposes REST API endpoints, the database stores structured trip data, and the frontend visualizes results using charts.
 
-# Project Links
+# Our Project Links 
 
 - Demo Video: [Insert Demo Video Link Here]
 - Team Sheet: [https://docs.google.com/spreadsheets/d/1CcPA_Nx1QI9QoHH6m04kWU8KfAFuQOBvJJqxml7IZqs/edit?usp=sharing]
