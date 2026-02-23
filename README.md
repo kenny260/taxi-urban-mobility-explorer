@@ -5,7 +5,7 @@ Taxi Urban Mobility Explorer is a full-stack data analytics system built to anal
 
 # Our Project Links 
 
-- Demo Video: [https://youtu.be/Pzc10zZ7JnE]
+- Demo Video: [https://youtu.be/C8aG-Mg2j1E?feature=shared]
 - Team Sheet: [https://docs.google.com/spreadsheets/d/1CcPA_Nx1QI9QoHH6m04kWU8KfAFuQOBvJJqxml7IZqs/edit?usp=sharing]
 - Technical Documentation Report: [https://docs.google.com/document/d/1gS8jSFAX83OzD_r73njuk386phhWOhr6-6O-Z-VsYR0/edit?usp=sharing]
 
